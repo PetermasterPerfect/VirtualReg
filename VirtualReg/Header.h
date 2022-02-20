@@ -1,14 +1,5 @@
 #pragma once
-#pragma warning(disable: 4100)
-#pragma warning(disable: 4101)
-#pragma warning(disable: 4302)
 #pragma warning(disable: 4996)
-#pragma warning(disable: 4700)
-#pragma warning(disable: 4458)
-#pragma warning(disable: 4701)
-#pragma warning(disable: 6001)
-#pragma warning(disable: 6387)
-#pragma warning(disable: 4267)
 #include <ntifs.h>
 #include <ntddk.h>
 #include <string.h>
@@ -45,12 +36,13 @@ NTSTATUS QueryForRegistryString(PVOID, PUNICODE_STRING);
 WCHAR* CatPathsAtCreateRegistryEvent(WCHAR*, WCHAR*);
 WCHAR* CutKeyRoot(UNICODE_STRING*);
 
-
 bool CreateBaseVirtualKey();
 PVOID CreateVirtualKey(WCHAR*, ULONG);
+PVOID CreateKey(WCHAR*);
 WCHAR* CreateKeyPathWithPid(WCHAR*, ULONG);
 
 PVOID WrapCreatingVirtualKeyProcess(WCHAR*, ULONG);
+PVOID WrapRestoringKeyProcess(WCHAR*);
 HANDLE OpenRegistryKeyHandle(WCHAR*);
 WCHAR* EnumKeyValues(WCHAR*, ULONG, ULONG length=sizeof(KEY_VALUE_BASIC_INFORMATION));
 int CountSlashes(WCHAR*);

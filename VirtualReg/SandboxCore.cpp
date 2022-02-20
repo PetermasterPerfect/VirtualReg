@@ -2,26 +2,53 @@
 
 PVOID WrapCreatingVirtualKeyProcess(WCHAR* Ending, ULONG Pid)
 {
-	int len = wcsnlen(Ending, 255 - wcslen(LOCAL_KEY_ROOT));
+	size_t len = wcsnlen(Ending, 255 - wcslen(LOCAL_KEY_ROOT));
 	PVOID ret = nullptr;
 	WCHAR keyBuf[MAX_KEY_PATH_LENGTH];
 	ret = CreateVirtualKey(L"", Pid);
 	if (ret == nullptr)
-		goto EXIT;
-	for (int i = 0; i < len; i++)
+		return ret;
+
+	for (size_t i = 0; i < len; i++)
 	{
-		if (Ending[i] == '\\')
+		if (Ending[i] == L'\\')
 		{
-			memset(keyBuf, 0, MAX_KEY_PATH_LENGTH);
+			memset(keyBuf, 0, sizeof(WCHAR) * (i+1));
 			memmove(keyBuf, Ending, sizeof(WCHAR) * i);
 			ret = CreateVirtualKey(keyBuf, Pid);
+			if (ret == nullptr)
+				return ret;
+		}
+	}
+	ret = CreateVirtualKey(Ending, Pid);
+	return ret;
+}
+
+PVOID WrapRestoringKeyProcess(WCHAR* Str)
+{
+	size_t len = wcsnlen(Str, MAX_KEY_PATH_LENGTH);
+	if (wcslen(LOCAL_KEY_ROOT) >= len)
+		return nullptr;
+	WCHAR *buf = (WCHAR*)ExAllocatePool(PagedPool, sizeof(WCHAR)*(len+1));
+	if (buf == nullptr)
+		ExFreePool(buf);
+	PVOID ret;
+
+	for (size_t i = 1; i < len; i++)
+	{
+		if (Str[i] == L'\\')
+		{
+			memset(buf, 0, sizeof(WCHAR) * (i + 1));
+			memmove(buf, Str, sizeof(WCHAR) * i);
+			ret = CreateKey(buf);
 			if (ret == nullptr)
 				goto EXIT;
 		}
 	}
-	ret = CreateVirtualKey(Ending, Pid);
 
+	ret = CreateKey(Str);
 EXIT:
+	ExFreePool(buf);
 	return ret;
 }
 
@@ -30,7 +57,7 @@ int CountSlashes(WCHAR *str)
 	int len = wcsnlen(str, 255 - wcslen(LOCAL_KEY_ROOT));
 	int count = 0;
 	for (int i = 0; i < len; i++)
-		str[i] == (WCHAR)L"\\" ? count++ : count;
+		str[i] == L'\\' ? count++ : count;
 	return count;
 }
 
@@ -41,6 +68,35 @@ bool CreateBaseVirtualKey()
 		return false;
 	ZwClose(hKey);
 	return true;
+}
+
+PVOID CreateKey(WCHAR* KeyPath)
+{
+	PVOID keyObject;
+	HANDLE hKey;
+	NTSTATUS status;
+
+
+	hKey = OpenRegistryKeyHandle(KeyPath);
+	if (hKey == NULL)
+		return nullptr;
+
+	status = ObReferenceObjectByHandle(hKey,
+		KEY_SET_VALUE,
+		*CmKeyObjectType,
+		KernelMode,
+		&keyObject,
+		NULL);
+
+	if (!NT_SUCCESS(status))
+	{
+		KdPrint(("ObReferenceObjectByHandle in CreateVirtualKey FAILED %x\n", status));
+		ZwClose(hKey);
+		return nullptr;
+	}
+
+	ZwClose(hKey);
+	return keyObject;
 }
 
 PVOID CreateVirtualKey(WCHAR *Ending, ULONG Pid)
@@ -179,7 +235,7 @@ bool DeleteKeyBackward(WCHAR* Path, ULONG Pid)
 
 	for (int i = len - 1; i >= 0; i--)
 	{
-		if (Path[i] == '\\')
+		if (Path[i] == L'\\')
 		{
 			memset(buf, 0, MAX_KEY_PATH_LENGTH);
 			memmove(buf, Path, i*sizeof(WCHAR));
@@ -252,7 +308,6 @@ void DeleteVirtualKeys()
 void RestoreVirtualKeys()
 {
 	Node<TrackedProcess>* buf = g_Data.ProcessTrackingList.head;
-	
 	while (buf != nullptr)
 	{
 
@@ -279,6 +334,7 @@ void RestoreValuesForSingleKey(WCHAR* VirtualKeyPath, WCHAR* KeyPathToRestore)
 {
 	int i = 0;
 	WCHAR* keyValue;
+	WrapRestoringKeyProcess(KeyPathToRestore);
 	for (keyValue = EnumKeyValues(VirtualKeyPath, i, wcsnlen(VirtualKeyPath, MAX_KEY_PATH_LENGTH)); keyValue != nullptr;
 		keyValue = EnumKeyValues(VirtualKeyPath, i, wcsnlen(VirtualKeyPath, MAX_KEY_PATH_LENGTH)), i++)
 	{
@@ -290,7 +346,7 @@ void RestoreValuesForSingleKey(WCHAR* VirtualKeyPath, WCHAR* KeyPathToRestore)
 		}
 		UNICODE_STRING valueUnicode;
 		valueUnicode.Buffer = keyValue;
-		valueUnicode.Length = (ULONG)(wcsnlen(keyValue, MAX_KEY_PATH_LENGTH) * sizeof(WCHAR));
+		valueUnicode.Length = (USHORT)(wcsnlen(keyValue, MAX_KEY_PATH_LENGTH) * sizeof(WCHAR));
 		valueUnicode.MaximumLength = MAX_KEY_PATH_LENGTH;
 
 		RegistryKeyValue* queriedValue = QueryKeyValue(hKey, &valueUnicode);

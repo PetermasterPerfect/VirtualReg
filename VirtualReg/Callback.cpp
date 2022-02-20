@@ -8,6 +8,7 @@ NTSTATUS OnPreRegisterCallback(
 	PVOID Argument2
 )
 {
+	UNREFERENCED_PARAMETER(CallbackContext);
 	ULONG pid;
 	pid = (ULONG)PsGetCurrentProcessId();
 	if (!g_Data.IsPidPresent(pid))
@@ -30,7 +31,6 @@ NTSTATUS HookSettingValue(PVOID Argument2, ULONG Pid)
 {
 	NTSTATUS status;
 	PVOID originalKeyBody = ((REG_SET_VALUE_KEY_INFORMATION*)Argument2)->Object;
-	ULONG len;
 	PUNICODE_STRING originalKeyPath = (PUNICODE_STRING)ExAllocatePool(PagedPool, MAX_KEY_PATH_LENGTH * sizeof(WCHAR));
 	if (originalKeyPath == nullptr)
 		return STATUS_INSUFFICIENT_RESOURCES;
@@ -71,7 +71,6 @@ NTSTATUS HookRegistryCreation(PVOID Argument2, ULONG Pid)
 {
 	NTSTATUS status;
 	PVOID originalKeyBody = ((REG_CREATE_KEY_INFORMATION*)Argument2)->RootObject;
-	ULONG len;
 	PUNICODE_STRING originalKeyPath = (PUNICODE_STRING)ExAllocatePool(PagedPool, MAX_KEY_PATH_LENGTH * sizeof(WCHAR));
 	if (originalKeyPath == nullptr)
 		return STATUS_INSUFFICIENT_RESOURCES;
