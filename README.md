@@ -1,0 +1,1 @@
+My try to do one of exercises from Pavel Yosifovich book - Windows Kernel Programming. It's kernel driver which hooks registry operations and redirects them if given registry path was added by user to be sandboxed (because yes - you can that it is a little sandbox).
